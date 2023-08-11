@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/scale"
 	"k8s.io/kubernetes/test/e2e/framework"
 	frameworkauth "k8s.io/kubernetes/test/e2e/framework/auth"
+	frameworkpod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -62,7 +63,6 @@ func New(name string, opt ...Option) *Client {
 	client := &Client{
 		Framework: framework.Framework{
 			BaseName:                         name,
-			AddonResourceConstraints:         make(map[string]framework.ResourceConstraint),
 			NamespacePodSecurityEnforceLevel: admissionapi.LevelPrivileged,
 			Options:                          options.Options,
 		},
@@ -155,12 +155,12 @@ func (c *Client) WaitForPlanJobs(plan *upgradeapiv1.Plan, count int, timeout tim
 
 func (c *Client) BeforeEach() {
 	c.beforeFramework()
-	c.Framework.BeforeEach()
+	c.Framework.BeforeEach(context.Background())
 	c.setupController()
 }
 
 func (c *Client) AfterEach() {
-	c.Framework.AfterEach()
+	c.Framework.AfterEach(context.Background())
 }
 
 func (c *Client) setupController() {
@@ -173,7 +173,7 @@ func (c *Client) setupController() {
 	}, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	err = frameworkauth.BindClusterRole(c.ClientSet.RbacV1(), "cluster-admin", c.Namespace.Name, rbacv1.Subject{
+	err = frameworkauth.BindClusterRole(context.Background(),c.ClientSet.RbacV1(), "cluster-admin", c.Namespace.Name, rbacv1.Subject{
 		Kind:      rbacv1.ServiceAccountKind,
 		Name:      c.controllerServiceAccount.Name,
 		Namespace: c.controllerServiceAccount.Namespace,
@@ -236,4 +236,10 @@ func (c *Client) beforeFramework() {
 	c.Framework.ScalesGetter = scale.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
 
 	framework.TestContext.CloudConfig.Provider.FrameworkBeforeEach(&c.Framework)
+}
+
+
+
+func (c *Client) PodClient() *frameworkpod.PodClient{
+	return frameworkpod.NewPodClient(&c.Framework)
 }
